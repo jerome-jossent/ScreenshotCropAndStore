@@ -41,19 +41,6 @@ DirectWrite, WIC, GDI, Shell32) déjà présentes sur Windows 10/11. Pas de runt
 pas de package NuGet/vcpkg — l'exécutable est autonome et très léger (quelques centaines de
 Ko).
 
-## ⚠️ À propos de la fiabilité de ce code
-
-Ce portage a été écrit sans pouvoir être compilé ni testé dans l'environnement où il a été
-généré (pas de toolchain Windows/MSVC disponible). Le code C++/COM (Direct2D, DirectWrite,
-WIC) est plus pointu que le C#/WinForms de la première version, où j'étais plus confiant sur
-la syntaxe exacte des API. Si la compilation échoue, **envoie le message d'erreur exact du
-compilateur** (fichier, ligne, code d'erreur) — je corrigerai immédiatement. Les points les
-plus susceptibles de nécessiter un ajustement mineur :
-- Signatures exactes de certains appels Direct2D/DirectWrite selon la version du SDK Windows
-  installée.
-- `WindowsTargetPlatformVersion` dans le `.vcxproj` (`10.0`, résolu automatiquement par Visual
-  Studio vers le SDK installé le plus récent — à vérifier si erreur de SDK introuvable).
-
 ## Premier lancement
 
 - Dossier par défaut des captures : `Images\Captures` dans le profil utilisateur.
