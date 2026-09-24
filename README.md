@@ -48,12 +48,4 @@ Ko).
 - Même point d'attention Windows 11 que la version C# : si *Paramètres > Accessibilité >
   Clavier > "Utiliser la touche Impr écran pour ouvrir la capture d'écran"* est activé,
   désactive-le pour éviter un déclenchement en double avec l'outil Windows.
-
-## Pistes d'amélioration possibles
-
-- Utiliser l'API de duplication de bureau (DXGI Desktop Duplication) au lieu de `BitBlt` pour
-  la capture initiale — gain surtout utile en cas de captures très fréquentes ou d'options
-  HDR/multi-GPU avancées ; `BitBlt` reste largement suffisant ici car la capture n'a lieu
-  qu'une fois par screenshot, pas à chaque frame.
-- Éditeur d'annotations post-capture (flèches, texte, floutage), en réutilisant `Overlay.cpp`
   comme base.
