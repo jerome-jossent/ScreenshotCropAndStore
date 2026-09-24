@@ -1,0 +1,6 @@
+#include <winres.h>
+#include "resource.h"
+
+// Icône principale de l'exécutable (barre des tâches, explorateur, Alt-Tab).
+// L'ID IDI_APP_ICON est référencé depuis main.cpp pour charger la même icône dans le tray.
+IDI_APP_ICON ICON "screenshot_1.ico"
