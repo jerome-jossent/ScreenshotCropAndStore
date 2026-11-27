@@ -41,19 +41,6 @@ DirectWrite, WIC, GDI, Shell32) déjà présentes sur Windows 10/11. Pas de runt
 pas de package NuGet/vcpkg — l'exécutable est autonome et très léger (quelques centaines de
 Ko).
 
-## ⚠️ À propos de la fiabilité de ce code
-
-Ce portage a été écrit sans pouvoir être compilé ni testé dans l'environnement où il a été
-généré (pas de toolchain Windows/MSVC disponible). Le code C++/COM (Direct2D, DirectWrite,
-WIC) est plus pointu que le C#/WinForms de la première version, où j'étais plus confiant sur
-la syntaxe exacte des API. Si la compilation échoue, **envoie le message d'erreur exact du
-compilateur** (fichier, ligne, code d'erreur) — je corrigerai immédiatement. Les points les
-plus susceptibles de nécessiter un ajustement mineur :
-- Signatures exactes de certains appels Direct2D/DirectWrite selon la version du SDK Windows
-  installée.
-- `WindowsTargetPlatformVersion` dans le `.vcxproj` (`10.0`, résolu automatiquement par Visual
-  Studio vers le SDK installé le plus récent — à vérifier si erreur de SDK introuvable).
-
 ## Premier lancement
 
 - Dossier par défaut des captures : `Images\Captures` dans le profil utilisateur.
@@ -61,14 +48,6 @@ plus susceptibles de nécessiter un ajustement mineur :
 - Même point d'attention Windows 11 que la version C# : si *Paramètres > Accessibilité >
   Clavier > "Utiliser la touche Impr écran pour ouvrir la capture d'écran"* est activé,
   désactive-le pour éviter un déclenchement en double avec l'outil Windows.
-
-## Pistes d'amélioration possibles
-
-- Utiliser l'API de duplication de bureau (DXGI Desktop Duplication) au lieu de `BitBlt` pour
-  la capture initiale — gain surtout utile en cas de captures très fréquentes ou d'options
-  HDR/multi-GPU avancées ; `BitBlt` reste largement suffisant ici car la capture n'a lieu
-  qu'une fois par screenshot, pas à chaque frame.
-- Éditeur d'annotations post-capture (flèches, texte, floutage), en réutilisant `Overlay.cpp`
   comme base.
 
 ## Post-its (image épinglée à l'écran)
