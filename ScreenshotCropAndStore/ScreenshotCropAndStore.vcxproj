@@ -80,6 +80,7 @@
     <ClCompile Include="ImageIO.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="Startup.cpp" />
+    <ClCompile Include="PostIt.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -88,6 +89,7 @@
     <ClInclude Include="ImageIO.h" />
     <ClInclude Include="Settings.h" />
     <ClInclude Include="Startup.h" />
+    <ClInclude Include="PostIt.h" />
   </ItemGroup>
 
   <ItemGroup>

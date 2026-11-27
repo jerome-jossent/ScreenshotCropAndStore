@@ -70,3 +70,16 @@ plus susceptibles de nécessiter un ajustement mineur :
   qu'une fois par screenshot, pas à chaque frame.
 - Éditeur d'annotations post-capture (flèches, texte, floutage), en réutilisant `Overlay.cpp`
   comme base.
+
+## Post-its (image épinglée à l'écran)
+
+Menu de l'icône de la barre des tâches → **Ouvrir l'image comme un post-it** (dernière capture).
+
+- Fenêtre sans bord, au premier plan par défaut, à la taille réelle de la capture.
+- **Glisser** : déplacer. **Bords/coins** : redimensionner (ratio conservé).
+- **Molette** : zoom autour du curseur. **Alt + molette** : opacité.
+- **Clic droit** : toujours au premier plan (bascule), afficher à 100 %, mode traversable, fermer.
+- **Mode traversable** (global) : les clics passent à travers tous les post-its. Pour le désactiver :
+  menu de l'icône ou **Ctrl+Maj+Impr écran**.
+- Menu de l'icône : **Fermer tous les post-its**.
+- Contour fin de 1 px désactivable via `kDrawThinBorder` dans `PostIt.cpp`.

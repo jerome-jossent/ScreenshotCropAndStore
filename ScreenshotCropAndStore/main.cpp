@@ -5,12 +5,14 @@
 #include <shellscalingapi.h>
 #include <string>
 #include <optional>
+#include <memory>
 #include <algorithm>
 #include "Capture.h"
 #include "Overlay.h"
 #include "ImageIO.h"
 #include "Settings.h"
 #include "Startup.h"
+#include "PostIt.h"
 #include "resource.h"
 
 #pragma comment(lib, "shell32.lib")
@@ -22,6 +24,7 @@ namespace
     constexpr UINT WM_TRAYICON = WM_APP + 1;
     constexpr int ID_HOTKEY_CAPTURE = 1;
     constexpr int ID_HOTKEY_REPEAT = 2;
+    constexpr int ID_HOTKEY_CLICKTHROUGH = 3;
 
     constexpr UINT_PTR ID_MENU_CAPTURE = 1001;
     constexpr UINT_PTR ID_MENU_REPEAT = 1002;
@@ -30,6 +33,9 @@ namespace
     constexpr UINT_PTR ID_MENU_STARTUP = 1005;
     constexpr UINT_PTR ID_MENU_EXIT = 1006;
     constexpr UINT_PTR ID_MENU_DIAGNOSTIC = 1007;
+    constexpr UINT_PTR ID_MENU_POSTIT = 1008;
+    constexpr UINT_PTR ID_MENU_CLOSE_POSTITS = 1009;
+    constexpr UINT_PTR ID_MENU_CLICKTHROUGH = 1010;
 
     HINSTANCE g_hInstance = nullptr;
     HWND g_hwnd = nullptr;
@@ -37,6 +43,7 @@ namespace
     AppSettings g_settings;
     std::optional<RECT> g_lastRegion;
     std::wstring g_lastSavedFilePath;
+    std::shared_ptr<const PostItImage> g_lastImage; // pixels de la dernière capture (post-it)
 
     bool FileExists(const std::wstring& path)
     {
@@ -80,7 +87,7 @@ namespace
         Shell_NotifyIcon(NIM_MODIFY, &nid);
     }
 
-    void SaveAndCopy(const CapturedImage& full, RECT cropLocal)
+    void SaveAndCopy(const CapturedImage& full, RECT cropLocal, const RECT& virtualBounds)
     {
         CreateDirectoryW(g_settings.saveFolder.c_str(), nullptr);
         std::wstring filename = MakeTimestampedFilename();
@@ -88,6 +95,14 @@ namespace
 
         bool savedOk = SaveCroppedPng(full, cropLocal, path);
         CopyCroppedToClipboard(g_hwnd, full, cropLocal);
+
+        // Garde les pixels de la dernière capture en mémoire pour "Ouvrir comme un post-it".
+        auto image = std::make_shared<PostItImage>();
+        if (CropToBuffer(full, cropLocal, image->pixels, image->width, image->height))
+        {
+            image->screenOrigin = { virtualBounds.left + cropLocal.left, virtualBounds.top + cropLocal.top };
+            g_lastImage = std::move(image);
+        }
 
         if (savedOk)
         {
@@ -109,7 +124,7 @@ namespace
         if (!accepted) return;
 
         g_lastRegion = selection;
-        SaveAndCopy(capture, selection);
+        SaveAndCopy(capture, selection, bounds);
     }
 
     void DoRepeatCapture()
@@ -138,7 +153,26 @@ namespace
             return;
         }
 
-        SaveAndCopy(capture, safeRegion);
+        SaveAndCopy(capture, safeRegion, bounds);
+    }
+
+    void OpenLastCaptureAsPostIt()
+    {
+        if (!g_lastImage)
+        {
+            ShowBalloon(L"ScreenshotCropAndStore", L"Aucune capture en mémoire : fais d'abord une capture.");
+            return;
+        }
+        OpenPostIt(g_hInstance, g_lastImage);
+    }
+
+    void ToggleClickThrough()
+    {
+        bool enable = !PostItsClickThrough();
+        SetPostItsClickThrough(enable);
+        ShowBalloon(L"ScreenshotCropAndStore",
+            enable ? L"Post-its traversables : activé (Ctrl+Maj+Impr écran pour désactiver)"
+                   : L"Post-its traversables : désactivé");
     }
 
     void ChangeFolderDialog(HWND owner)
@@ -205,6 +239,11 @@ namespace
         AppendMenuW(menu, MF_STRING, ID_MENU_CAPTURE, L"Nouvelle capture");
         AppendMenuW(menu, MF_STRING, ID_MENU_REPEAT, L"Répéter la dernière zone (Ctrl+Impr écran)");
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(menu, MF_STRING | (g_lastImage ? 0 : MF_GRAYED), ID_MENU_POSTIT, L"Ouvrir l'image comme un post-it");
+        AppendMenuW(menu, MF_STRING | (PostItCount() > 0 ? 0 : MF_GRAYED), ID_MENU_CLOSE_POSTITS, L"Fermer tous les post-its");
+        AppendMenuW(menu, MF_STRING | (PostItsClickThrough() ? MF_CHECKED : 0), ID_MENU_CLICKTHROUGH,
+            L"Post-its traversables (Ctrl+Maj+Impr écran)");
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(menu, MF_STRING, ID_MENU_OPEN_FOLDER, L"Ouvrir le dossier (dernier fichier sélectionné)");
         AppendMenuW(menu, MF_STRING, ID_MENU_CHANGE_FOLDER, L"Changer le dossier de sauvegarde...");
         AppendMenuW(menu, MF_STRING | (StartupHelper::IsEnabled() ? MF_CHECKED : 0),
@@ -227,6 +266,7 @@ namespace
         case WM_HOTKEY:
             if (wParam == ID_HOTKEY_CAPTURE) DoInteractiveCapture();
             else if (wParam == ID_HOTKEY_REPEAT) DoRepeatCapture();
+            else if (wParam == ID_HOTKEY_CLICKTHROUGH) ToggleClickThrough();
             return 0;
 
         case WM_TRAYICON:
@@ -242,6 +282,9 @@ namespace
             {
             case ID_MENU_CAPTURE: DoInteractiveCapture(); break;
             case ID_MENU_REPEAT: DoRepeatCapture(); break;
+            case ID_MENU_POSTIT: OpenLastCaptureAsPostIt(); break;
+            case ID_MENU_CLOSE_POSTITS: CloseAllPostIts(); break;
+            case ID_MENU_CLICKTHROUGH: ToggleClickThrough(); break;
             case ID_MENU_OPEN_FOLDER:
                 RevealLastCaptureInExplorer();
                 break;
@@ -266,9 +309,11 @@ namespace
             return 0;
 
         case WM_DESTROY:
+            CloseAllPostIts();
             Shell_NotifyIcon(NIM_DELETE, &g_nid);
             UnregisterHotKey(hwnd, ID_HOTKEY_CAPTURE);
             UnregisterHotKey(hwnd, ID_HOTKEY_REPEAT);
+            UnregisterHotKey(hwnd, ID_HOTKEY_CLICKTHROUGH);
             PostQuitMessage(0);
             return 0;
         }
@@ -328,6 +373,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
             L"Tu peux toujours déclencher une capture depuis l'icône dans la barre des tâches.",
             L"ScreenshotCropAndStore", MB_OK | MB_ICONWARNING);
     }
+
+    // Raccourci du mode traversable : si une autre application l'utilise déjà, on ignore
+    // silencieusement (le même réglage reste accessible depuis le menu de l'icône).
+    RegisterHotKey(g_hwnd, ID_HOTKEY_CLICKTHROUGH, MOD_CONTROL | MOD_SHIFT, VK_SNAPSHOT);
 
     g_nid.cbSize = sizeof(NOTIFYICONDATA);
     g_nid.hWnd = g_hwnd;

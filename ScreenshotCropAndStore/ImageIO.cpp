@@ -9,40 +9,37 @@
 
 using Microsoft::WRL::ComPtr;
 
-namespace
+// Copie la sous-région 'crop' de l'image source dans un buffer BGRA top-down compact.
+bool CropToBuffer(const CapturedImage& full, RECT crop, std::vector<BYTE>& outBuffer, int& outW, int& outH)
 {
-    // Copie la sous-région 'crop' de l'image source dans un buffer BGRA top-down compact.
-    bool CropPixels(const CapturedImage& full, RECT crop, std::vector<BYTE>& outBuffer, int& outW, int& outH)
+    if (!full.IsValid()) return false;
+
+    int w = crop.right - crop.left;
+    int h = crop.bottom - crop.top;
+    if (w <= 0 || h <= 0) return false;
+    if (crop.left < 0 || crop.top < 0 || crop.right > full.width || crop.bottom > full.height) return false;
+
+    outW = w;
+    outH = h;
+    outBuffer.resize(static_cast<size_t>(w) * h * 4);
+
+    const BYTE* src = static_cast<const BYTE*>(full.bits);
+    for (int row = 0; row < h; ++row)
     {
-        if (!full.IsValid()) return false;
-
-        int w = crop.right - crop.left;
-        int h = crop.bottom - crop.top;
-        if (w <= 0 || h <= 0) return false;
-        if (crop.left < 0 || crop.top < 0 || crop.right > full.width || crop.bottom > full.height) return false;
-
-        outW = w;
-        outH = h;
-        outBuffer.resize(static_cast<size_t>(w) * h * 4);
-
-        const BYTE* src = static_cast<const BYTE*>(full.bits);
-        for (int row = 0; row < h; ++row)
-        {
-            const BYTE* srcRow = src
-                + static_cast<size_t>(crop.top + row) * full.strideBytes
-                + static_cast<size_t>(crop.left) * 4;
-            BYTE* dstRow = outBuffer.data() + static_cast<size_t>(row) * w * 4;
-            memcpy(dstRow, srcRow, static_cast<size_t>(w) * 4);
-        }
-        return true;
+        const BYTE* srcRow = src
+            + static_cast<size_t>(crop.top + row) * full.strideBytes
+            + static_cast<size_t>(crop.left) * 4;
+        BYTE* dstRow = outBuffer.data() + static_cast<size_t>(row) * w * 4;
+        memcpy(dstRow, srcRow, static_cast<size_t>(w) * 4);
     }
+    return true;
 }
 
 bool SaveCroppedPng(const CapturedImage& full, RECT crop, const std::wstring& path)
 {
     std::vector<BYTE> pixels;
     int w = 0, h = 0;
-    if (!CropPixels(full, crop, pixels, w, h)) return false;
+    if (!CropToBuffer(full, crop, pixels, w, h)) return false;
 
     ComPtr<IWICImagingFactory> wicFactory;
     HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
@@ -93,7 +90,7 @@ bool CopyCroppedToClipboard(HWND owner, const CapturedImage& full, RECT crop)
 {
     std::vector<BYTE> pixels;
     int w = 0, h = 0;
-    if (!CropPixels(full, crop, pixels, w, h)) return false;
+    if (!CropToBuffer(full, crop, pixels, w, h)) return false;
 
     BITMAPINFOHEADER bih{};
     bih.biSize = sizeof(BITMAPINFOHEADER);
